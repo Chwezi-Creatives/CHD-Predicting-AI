@@ -1,10 +1,4 @@
-import pandas as pd
-
-# Load the dataset
-file_path = r'C:\Users\HP\CHd prediction llm\MGH_PredictionDataSet.csv'
-data = pd.read_csv(file_path)
-
-# Display the first few rows of the dataset to understand its structure
+#DATA CLEANING***
 data.head(), data.info(), data.describe()
 # Import necessary libraries
 import pandas as pd
@@ -96,3 +90,61 @@ X_test.to_csv('X_test_preprocessed.csv', index=False)
 y_train.to_csv('y_train.csv', index=False)
 y_val.to_csv('y_val.csv', index=False)
 y_test.to_csv('y_test.csv', index=False)
+
+
+
+
+
+
+#DATA FEATURE SELECTION***
+from sklearn.feature_selection import SelectKBest, mutual_info_classif, RFE
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+import pandas as pd
+
+# Feature selection using mutual information
+def select_features_kbest(X_train, y_train, X_val, y_val, k=10):
+    """Select top k features using mutual information and evaluate performance."""
+    selector = SelectKBest(score_func=mutual_info_classif, k=k)
+    X_train_selected = selector.fit_transform(X_train, y_train)
+    X_val_selected = selector.transform(X_val)
+    selected_features = X_train.columns[selector.get_support()]
+    print("Selected features (KBest):", selected_features.tolist())
+    return X_train_selected, X_val_selected, selected_features
+
+# Feature selection using Recursive Feature Elimination
+def select_features_rfe(X_train, y_train, X_val, y_val, n_features=10):
+    """Select features using Recursive Feature Elimination (RFE) and evaluate performance."""
+    estimator = RandomForestClassifier(random_state=42)
+    selector = RFE(estimator, n_features_to_select=n_features)
+    X_train_selected = selector.fit_transform(X_train, y_train)
+    X_val_selected = selector.transform(X_val)
+    selected_features = X_train.columns[selector.get_support()]
+    print("Selected features (RFE):", selected_features.tolist())
+    return X_train_selected, X_val_selected, selected_features
+
+# Evaluate feature selection methods
+def evaluate_feature_selection(X_train, y_train, X_val, y_val, method_name):
+    """Train and evaluate a simple model to compare feature selection methods."""
+    model = RandomForestClassifier(random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_val)
+    accuracy = accuracy_score(y_val, y_pred)
+    print(f"Accuracy with features from {method_name}: {accuracy:.2f}")
+    return accuracy
+
+# Select features
+k = 10
+X_train_kbest, X_val_kbest, selected_kbest = select_features_kbest(X_train, y_train, X_val, y_val, k=k)
+X_train_rfe, X_val_rfe, selected_rfe = select_features_rfe(X_train, y_train, X_val, y_val, n_features=k)
+
+# Evaluate selected features
+accuracy_kbest = evaluate_feature_selection(X_train_kbest, y_train, X_val_kbest, y_val, "KBest")
+accuracy_rfe = evaluate_feature_selection(X_train_rfe, y_train, X_val_rfe, y_val, "RFE")
+
+# Save results
+pd.DataFrame(X_train_kbest, columns=selected_kbest).to_csv('X_train_kbest.csv', index=False)
+pd.DataFrame(X_val_kbest, columns=selected_kbest).to_csv('X_val_kbest.csv', index=False)
+pd.DataFrame(X_train_rfe, columns=selected_rfe).to_csv('X_train_rfe.csv', index=False)
+pd.DataFrame(X_val_rfe, columns=selected_rfe).to_csv('X_val_rfe.csv', index=False)
+
