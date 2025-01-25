@@ -96,3 +96,67 @@ X_test.to_csv('X_test_preprocessed.csv', index=False)
 y_train.to_csv('y_train.csv', index=False)
 y_val.to_csv('y_val.csv', index=False)
 y_test.to_csv('y_test.csv', index=False)
+
+
+
+# TRAINING STEP - IMPROVED ***
+from imblearn.combine import SMOTETomek
+from xgboost import XGBClassifier
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    roc_auc_score,
+    f1_score,
+)
+import pandas as pd
+
+# Load data
+X_train = pd.read_csv("X_train_preprocessed.csv")
+X_val = pd.read_csv("X_val_preprocessed.csv")
+y_train = pd.read_csv("y_train.csv").squeeze()
+y_val = pd.read_csv("y_val.csv").squeeze()
+
+# Address class imbalance using SMOTE-Tomek Links
+print("Before SMOTE-Tomek:", Counter(y_train))
+smote_tomek = SMOTETomek(random_state=42)
+X_train_balanced, y_train_balanced = smote_tomek.fit_resample(X_train, y_train)
+print("After SMOTE-Tomek:", Counter(y_train_balanced))
+
+# Train an XGBoost classifier with optimized parameters
+def train_xgboost(X_train, y_train, X_val, y_val):
+    model = XGBClassifier(
+        max_depth=6,
+        n_estimators=300,
+        learning_rate=0.1,
+        scale_pos_weight=len(y_train) / sum(y_train),  # Account for imbalance
+        random_state=42,
+        use_label_encoder=False,
+        eval_metric="logloss",
+    )
+    model.fit(X_train, y_train)
+    
+    # Validation predictions
+    y_val_pred = model.predict(X_val)
+    y_val_pred_proba = model.predict_proba(X_val)[:, 1]
+    
+    print("\nValidation Classification Report:")
+    print(classification_report(y_val, y_val_pred))
+    
+    print("\nValidation Confusion Matrix:")
+    print(confusion_matrix(y_val, y_val_pred))
+    
+    roc_auc = roc_auc_score(y_val, y_val_pred_proba)
+    f1 = f1_score(y_val, y_val_pred)
+    print(f"Validation ROC AUC Score: {roc_auc:.4f}")
+    print(f"Validation F1 Score: {f1:.4f}")
+    
+    return model
+
+# Train the model
+xgb_model = train_xgboost(X_train_balanced, y_train_balanced, X_val, y_val)
+
+# Save the model
+import joblib
+joblib.dump(xgb_model, "xgboost_chd_model.pkl")
+
+print("XGBoost model training completed and saved successfully.")
